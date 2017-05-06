@@ -32,7 +32,11 @@ Without basic understanding of data for training network. Archecture design and 
         train.py
         train_utils.py
         run.sh // train or drive
+    models/
+        model.h5
+        model.json
 
+    run1.mp4
 ## Data Augmentation
 The actual unit of steering input value is not important, as it is mostly a scale factor taken by simulator
 
@@ -288,6 +292,10 @@ Please see src/run.sh for
 * traing model
 
 It reserves 30 percent of augmented data as validation sets. There are more advanced training strategy can be applied such as early stop. 7 to 8 epochs using adam optimizer is enough to achieve stable MSE (mean square error) over 5 to 7 epochs.
+
+Full run video can be found in run1.mp4 or [link](https://www.youtube.com/watch?v=ozahXAmducQ)
+
+Trained model locates under models/
 
 ## Future improvments
 
