@@ -16,11 +16,15 @@ from keras.models import load_model
 import h5py
 from keras import __version__ as keras_version
 
+from image_utils import preprocess
+from keras.models import Model
+from config import W, H
+from PIL import Image
+
 sio = socketio.Server()
 app = Flask(__name__)
 model = None
 prev_image_array = None
-
 
 class SimplePIController:
     def __init__(self, Kp, Ki):
@@ -44,6 +48,7 @@ class SimplePIController:
 
 
 controller = SimplePIController(0.1, 0.002)
+# Target speed can be overrided by command line see run.sh
 set_speed = 9
 controller.set_desired(set_speed)
 
@@ -61,7 +66,12 @@ def telemetry(sid, data):
         imgString = data["image"]
         image = Image.open(BytesIO(base64.b64decode(imgString)))
         image_array = np.asarray(image)
-        steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
+
+        image_array = preprocess(image_array).reshape(1, H, W, 1)
+
+        #image_array = crop_image(image_array)
+        # steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
+        steering_angle = float(model.predict(image_array, batch_size=1))
 
         throttle = controller.update(float(speed))
 
@@ -73,6 +83,7 @@ def telemetry(sid, data):
             timestamp = datetime.utcnow().strftime('%Y_%m_%d_%H_%M_%S_%f')[:-3]
             image_filename = os.path.join(args.image_folder, timestamp)
             image.save('{}.jpg'.format(image_filename))
+
     else:
         # NOTE: DON'T EDIT THIS.
         sio.emit('manual', data={}, skip_sid=True)
@@ -94,6 +105,19 @@ def send_control(steering_angle, throttle):
         skip_sid=True)
 
 
+def send_output(image, layer_name):
+    """
+    It's easier to use cv in python than js, so send large image
+    over the line
+    """
+    sio.emit(
+        layer_name,
+        data={
+          'image': image
+          },
+        skip_sid=True)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Remote Driving')
     parser.add_argument(
@@ -108,6 +132,14 @@ if __name__ == '__main__':
         default='',
         help='Path to image folder. This is where the images from the run will be saved.'
     )
+
+    parser.add_argument(
+        'speed',
+        type=int,
+        default=9,
+        help='Target speed maintained by PID'
+    )
+
     args = parser.parse_args()
 
     # check that model Keras version is same as local Keras version
@@ -120,6 +152,7 @@ if __name__ == '__main__':
               ', but the model was built using ', model_version)
 
     model = load_model(args.model)
+    set_speed = args.speed
 
     if args.image_folder != '':
         print("Creating image folder at {}".format(args.image_folder))
